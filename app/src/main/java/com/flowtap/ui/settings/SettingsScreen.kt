@@ -1,11 +1,13 @@
 package com.flowtap.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BatteryAlert
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.Security
@@ -25,10 +27,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.flowtap.BuildConfig
 
-/** Phase 1 shell. Each row becomes live in later phases. */
+/** Rows without a click handler become live in later phases. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(contentPadding: PaddingValues) {
+fun SettingsScreen(contentPadding: PaddingValues, onImport: () -> Unit, onExportAll: () -> Unit) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier
@@ -43,7 +45,10 @@ fun SettingsScreen(contentPadding: PaddingValues) {
             item { SettingRow(Icons.Rounded.Security, "Permissions", "Phone, SMS, camera, brightness · phase 5") }
             item { SettingRow(Icons.Rounded.BatteryAlert, "Battery optimization", "Keeps automations on time · phase 4") }
             item { SectionLabel("Your flows") }
-            item { SettingRow(Icons.Rounded.IosShare, "Export & import", "Move flows between phones · phase 2") }
+            item {
+                SettingRow(Icons.Rounded.IosShare, "Export all flows", "Share a file to set up the other phone", onExportAll)
+            }
+            item { SettingRow(Icons.Rounded.Download, "Import flows", "Add flows from an exported file", onImport) }
             item { SectionLabel("About") }
             item { SettingRow(Icons.Rounded.Info, "FlowTap", "Version ${BuildConfig.VERSION_NAME}") }
         }
@@ -61,8 +66,9 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, subtitle: String) {
+private fun SettingRow(icon: ImageVector, title: String, subtitle: String, onClick: (() -> Unit)? = null) {
     ListItem(
+        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
         leadingContent = { Icon(icon, contentDescription = null) },
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle) },

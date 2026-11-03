@@ -1,7 +1,7 @@
 package com.flowtap.di
 
 import com.flowtap.data.FlowRepository
-import com.flowtap.data.InMemoryFlowRepository
+import com.flowtap.data.RoomFlowRepository
 import com.flowtap.data.run.PreviewFlowRunner
 import com.flowtap.domain.run.FlowRunner
 import dagger.Binds
@@ -14,7 +14,7 @@ import dagger.hilt.components.SingletonComponent
 abstract class AppModule {
 
     @Binds
-    abstract fun bindFlowRepository(impl: InMemoryFlowRepository): FlowRepository
+    abstract fun bindFlowRepository(impl: RoomFlowRepository): FlowRepository
 
     @Binds
     abstract fun bindFlowRunner(impl: PreviewFlowRunner): FlowRunner

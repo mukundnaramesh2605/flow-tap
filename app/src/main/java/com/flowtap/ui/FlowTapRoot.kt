@@ -15,9 +15,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination
@@ -31,6 +35,8 @@ import com.flowtap.ui.navigation.AutomationsRoute
 import com.flowtap.ui.navigation.FlowTapNavHost
 import com.flowtap.ui.navigation.HomeRoute
 import com.flowtap.ui.navigation.SettingsRoute
+import com.flowtap.ui.transfer.TransferViewModel
+import com.flowtap.ui.transfer.rememberTransferController
 import kotlin.reflect.KClass
 
 private enum class TopLevel(
@@ -46,16 +52,19 @@ private enum class TopLevel(
 }
 
 @Composable
-fun FlowTapRoot() {
+fun FlowTapRoot(transferViewModel: TransferViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
     val showBottomBar = destination == null || TopLevel.entries.any { destination.isIn(it) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val transfer = rememberTransferController(transferViewModel, snackbarHostState)
 
-    // Each screen owns its own Scaffold/TopAppBar; this one only hosts the bottom bar.
+    // Each screen owns its own Scaffold/TopAppBar; this one only hosts the bottom bar and snackbars.
     Scaffold(
         // Insets are handled by the bottom bar and by each screen's own top bar.
         contentWindowInsets = WindowInsets(0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             AnimatedVisibility(
                 visible = showBottomBar,
@@ -66,7 +75,12 @@ fun FlowTapRoot() {
             }
         },
     ) { padding ->
-        FlowTapNavHost(navController = navController, contentPadding = padding, modifier = Modifier)
+        FlowTapNavHost(
+            navController = navController,
+            contentPadding = padding,
+            transfer = transfer,
+            modifier = Modifier,
+        )
     }
 }
 

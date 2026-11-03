@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">FlowTap</string>
+    <string name="import_flows">Import into FlowTap</string>
 </resources>

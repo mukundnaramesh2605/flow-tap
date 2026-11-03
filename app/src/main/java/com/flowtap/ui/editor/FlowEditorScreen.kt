@@ -1,7 +1,8 @@
 package com.flowtap.ui.editor
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,27 +23,37 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -56,8 +67,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,60 +80,55 @@ import com.flowtap.domain.model.FlowColor
 import com.flowtap.domain.model.FlowIcon
 import com.flowtap.domain.model.Trigger
 import com.flowtap.ui.common.brush
-import com.flowtap.ui.common.describe
+import com.flowtap.ui.common.daysLabel
 import com.flowtap.ui.common.icon
 import com.flowtap.ui.common.primary
 import com.flowtap.ui.common.summary
+import com.flowtap.ui.common.timeLabel
 import com.flowtap.ui.common.title
 import com.flowtap.ui.common.vector
-
-@Composable
-fun FlowEditorScreen(
-    onBack: () -> Unit,
-    viewModel: FlowEditorViewModel = hiltViewModel(),
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    LaunchedEffect(viewModel) {
-        viewModel.closeEvents.collect { onBack() }
-    }
-    FlowEditorContent(
-        uiState = uiState,
-        onBack = onBack,
-        onNameChange = viewModel::setName,
-        onIconChange = viewModel::setIcon,
-        onColorChange = viewModel::setColor,
-        onSave = viewModel::save,
-        onDelete = viewModel::delete,
-    )
-}
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FlowEditorContent(
-    uiState: EditorUiState,
+fun FlowEditorScreen(
     onBack: () -> Unit,
-    onNameChange: (String) -> Unit,
-    onIconChange: (FlowIcon) -> Unit,
-    onColorChange: (FlowColor) -> Unit,
-    onSave: () -> Unit,
-    onDelete: () -> Unit,
+    onExport: (flowId: Long) -> Unit,
+    viewModel: FlowEditorViewModel = hiltViewModel(),
 ) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val apps by viewModel.apps.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { onBack() }
+    }
+    val requestBack = { if (uiState.hasChanges) confirmDiscard = true else onBack() }
+    BackHandler(enabled = uiState.hasChanges) { confirmDiscard = true }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(if (uiState.isNew) "New flow" else "Edit flow") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = requestBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    TextButton(onClick = onSave, enabled = uiState.canSave) {
+                    TextButton(onClick = viewModel::save, enabled = uiState.canSave) {
                         Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Save")
+                    }
+                    if (!uiState.isNew) {
+                        EditorOverflow(
+                            exportEnabled = !uiState.hasChanges,
+                            onExport = { onExport(viewModel.flowId) },
+                            onDelete = { confirmDelete = true },
+                        )
                     }
                 },
             )
@@ -127,31 +136,103 @@ private fun FlowEditorContent(
     ) { innerPadding ->
         if (uiState.isLoading) {
             Box(Modifier.fillMaxSize().padding(innerPadding), Alignment.Center) { CircularProgressIndicator() }
-            return@Scaffold
+        } else {
+            EditorList(uiState, innerPadding, viewModel)
         }
-        val draft = uiState.draft
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().imePadding(),
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                bottom = innerPadding.calculateBottomPadding() + 32.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            item {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier.size(96.dp).clip(MaterialTheme.shapes.large).background(draft.color.brush),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(draft.icon.vector, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
-                    }
-                }
-            }
-            item {
+    }
+
+    if (uiState.showActionPicker) {
+        ActionPickerSheet(onPick = viewModel::startNewAction, onDismiss = { viewModel.showActionPicker(false) })
+    }
+    uiState.actionEdit?.let { edit ->
+        ActionConfigSheet(
+            edit = edit,
+            apps = apps,
+            loadApps = viewModel::loadApps,
+            loadIcon = viewModel::appIcon,
+            onDone = viewModel::commitAction,
+            onDelete = edit.key?.let { key -> { viewModel.deleteAction(key) } },
+            onDismiss = viewModel::dismissActionEdit,
+        )
+    }
+    uiState.scheduleEdit?.let { edit ->
+        ScheduleDialog(
+            edit = edit,
+            onSave = viewModel::commitSchedule,
+            onDelete = edit.triggerId?.let { id -> { viewModel.deleteSchedule(id) } },
+            onDismiss = viewModel::dismissScheduleEdit,
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+            title = { Text("Delete “${uiState.name}”?") },
+            text = { Text("This removes the flow and its schedules. This can't be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = { confirmDelete = false; viewModel.delete() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
+    }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text("Discard changes?") },
+            text = { Text("You have unsaved changes to this flow.") },
+            confirmButton = { TextButton(onClick = { confirmDiscard = false; onBack() }) { Text("Discard") } },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } },
+        )
+    }
+}
+
+@Composable
+private fun EditorOverflow(exportEnabled: Boolean, onExport: () -> Unit, onDelete: () -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(if (exportEnabled) "Export flow" else "Save to export") },
+                leadingIcon = { Icon(Icons.Rounded.IosShare, contentDescription = null) },
+                enabled = exportEnabled,
+                onClick = { open = false; onExport() },
+            )
+            DropdownMenuItem(
+                text = { Text("Delete flow") },
+                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                onClick = { open = false; onDelete() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditorList(uiState: EditorUiState, innerPadding: PaddingValues, viewModel: FlowEditorViewModel) {
+    val haptics = LocalHapticFeedback.current
+    val listState = rememberLazyListState()
+    val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+        viewModel.moveAction(from.key, to.key)
+        haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().imePadding(),
+        contentPadding = PaddingValues(
+            top = innerPadding.calculateTopPadding() + 8.dp,
+            bottom = innerPadding.calculateBottomPadding() + 32.dp,
+        ),
+    ) {
+        item(key = "header") {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                FlowPreview(uiState.icon, uiState.color)
                 OutlinedTextField(
-                    value = draft.name,
-                    onValueChange = onNameChange,
+                    value = uiState.name,
+                    onValueChange = viewModel::setName,
                     label = { Text("Flow name") },
                     placeholder = { Text("e.g. Bedtime") },
                     singleLine = true,
@@ -161,66 +242,179 @@ private fun FlowEditorContent(
                     ),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 )
+                Column {
+                    SectionHeader("Color")
+                    ColorPicker(selected = uiState.color, onSelect = viewModel::setColor)
+                }
+                Column {
+                    SectionHeader("Icon")
+                    IconPicker(selected = uiState.icon, accent = uiState.color, onSelect = viewModel::setIcon)
+                }
+                SectionHeader(
+                    if (uiState.actions.isEmpty()) "Actions" else "Actions · ${uiState.actions.size}",
+                    hint = if (uiState.actions.size > 1) "Drag ≡ to reorder" else null,
+                )
             }
-            item {
-                SectionHeader("Color")
-                ColorPicker(selected = draft.color, onSelect = onColorChange)
+        }
+
+        if (uiState.actions.isEmpty()) {
+            item(key = "actions-empty") {
+                PlaceholderCard("No actions yet. Add a few — they run top to bottom when the flow runs.")
             }
-            item {
-                SectionHeader("Icon")
-                IconPicker(selected = draft.icon, accent = draft.color, onSelect = onIconChange)
+        }
+        items(uiState.actions, key = { it.key }) { draft ->
+            ReorderableItem(reorderState, key = draft.key) { isDragging ->
+                val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "dragElevation")
+                ActionRow(
+                    index = uiState.actions.indexOf(draft),
+                    action = draft.action,
+                    appMissing = (draft.action as? FlowAction.OpenApp)?.packageName in uiState.missingPackages,
+                    elevation = elevation,
+                    onClick = { viewModel.startEditAction(draft.key) },
+                    onDelete = { viewModel.deleteAction(draft.key) },
+                    dragHandle = {
+                        Icon(
+                            Icons.Rounded.DragHandle,
+                            contentDescription = "Reorder",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .draggableHandle(
+                                    onDragStarted = { haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate) },
+                                    onDragStopped = { haptics.performHapticFeedback(HapticFeedbackType.GestureEnd) },
+                                )
+                                .padding(8.dp),
+                        )
+                    },
+                )
             }
-            item {
-                SectionHeader("Actions")
-                ActionList(actions = draft.actions)
+        }
+        item(key = "add-action") {
+            FilledTonalButton(
+                onClick = { viewModel.showActionPicker(true) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add action")
             }
-            item {
-                SectionHeader("Automations")
-                TriggerList(triggers = draft.triggers)
-            }
-            if (!uiState.isNew) {
-                item {
-                    OutlinedButton(
-                        onClick = { confirmDelete = true },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    ) {
-                        Icon(Icons.Rounded.Delete, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Delete flow")
-                    }
+        }
+
+        item(key = "schedules") {
+            Column(Modifier.padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeader("Schedules", hint = "Fires automatically from phase 4")
+                if (uiState.triggers.isEmpty()) {
+                    PlaceholderCard("Runs only when you tap it. Add a schedule to run it automatically.")
+                }
+                uiState.triggers.forEach { trigger ->
+                    TriggerRow(
+                        trigger = trigger,
+                        onClick = { viewModel.startEditSchedule(trigger.id) },
+                        onToggle = { viewModel.setScheduleEnabled(trigger.id, it) },
+                    )
+                }
+                OutlinedButton(
+                    onClick = viewModel::startNewSchedule,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                ) {
+                    Icon(Icons.Rounded.Schedule, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add schedule")
                 }
             }
         }
     }
+}
 
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-            title = { Text("Delete “${uiState.draft.name}”?") },
-            text = { Text("This removes the flow and its automations. This can't be undone.") },
-            confirmButton = {
-                Button(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
-            },
-        )
+@Composable
+private fun FlowPreview(icon: FlowIcon, color: FlowColor) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier.size(96.dp).clip(MaterialTheme.shapes.large).background(color.brush),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon.vector, contentDescription = null, tint = Color.White, modifier = Modifier.size(48.dp))
+        }
     }
 }
 
 @Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-    )
+private fun SectionHeader(text: String, hint: String? = null) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.weight(1f))
+        if (hint != null) {
+            Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ActionRow(
+    index: Int,
+    action: FlowAction,
+    appMissing: Boolean,
+    elevation: Dp,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    dragHandle: @Composable () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        onClick = onClick,
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            dragHandle()
+            Box(
+                Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(action.icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
+                Text("${index + 1}. ${action.title}", style = MaterialTheme.typography.titleSmall)
+                Text(action.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                if (appMissing) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                        Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Not installed on this phone", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Rounded.Close, contentDescription = "Remove ${action.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TriggerRow(trigger: Trigger, onClick: () -> Unit, onToggle: (Boolean) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                when (trigger) {
+                    is Trigger.TimeOfDay -> {
+                        Text(trigger.timeLabel(), style = MaterialTheme.typography.titleMedium)
+                        Text(trigger.daysLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Switch(checked = trigger.enabled, onCheckedChange = onToggle)
+        }
+    }
 }
 
 @Composable
@@ -282,80 +476,11 @@ private fun IconPicker(selected: FlowIcon, accent: FlowColor, onSelect: (FlowIco
 }
 
 @Composable
-private fun ActionList(actions: List<FlowAction>) {
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (actions.isEmpty()) {
-            PlaceholderCard("No actions yet. Actions run top to bottom when the flow runs.")
-        }
-        actions.forEachIndexed { index, action ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "${index + 1}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(20.dp),
-                    )
-                    Box(
-                        Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            action.icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(action.title, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            action.summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-        // Phase 2: opens the action picker bottom sheet; reorder/delete arrive with it.
-        OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Rounded.Add, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Add action (coming in phase 2)")
-        }
-    }
-}
-
-@Composable
-private fun TriggerList(triggers: List<Trigger>) {
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (triggers.isEmpty()) {
-            PlaceholderCard("Runs only when you tap it. Schedules arrive in phase 4.")
-        }
-        triggers.forEach { trigger ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Text(trigger.describe(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Text(
-                        if (trigger.enabled) "On" else "Off",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun PlaceholderCard(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp)
             .clip(MaterialTheme.shapes.medium)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
             .padding(16.dp),

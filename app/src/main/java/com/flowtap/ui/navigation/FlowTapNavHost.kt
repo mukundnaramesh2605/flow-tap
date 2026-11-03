@@ -14,11 +14,13 @@ import com.flowtap.ui.automations.AutomationsScreen
 import com.flowtap.ui.editor.FlowEditorScreen
 import com.flowtap.ui.home.HomeScreen
 import com.flowtap.ui.settings.SettingsScreen
+import com.flowtap.ui.transfer.TransferController
 
 @Composable
 fun FlowTapNavHost(
     navController: NavHostController,
     contentPadding: PaddingValues,
+    transfer: TransferController,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -33,6 +35,8 @@ fun FlowTapNavHost(
                 contentPadding = contentPadding,
                 onCreateFlow = { navController.navigate(EditorRoute()) },
                 onEditFlow = { id -> navController.navigate(EditorRoute(flowId = id)) },
+                onImport = transfer.import,
+                onExportAll = transfer.exportAll,
             )
         }
         composable<AutomationsRoute> {
@@ -42,13 +46,17 @@ fun FlowTapNavHost(
             )
         }
         composable<SettingsRoute> {
-            SettingsScreen(contentPadding = contentPadding)
+            SettingsScreen(
+                contentPadding = contentPadding,
+                onImport = transfer.import,
+                onExportAll = transfer.exportAll,
+            )
         }
         composable<EditorRoute>(
             enterTransition = { slideInHorizontally { it } + fadeIn() },
             popExitTransition = { slideOutHorizontally { it } + fadeOut() },
         ) {
-            FlowEditorScreen(onBack = { navController.popBackStack() })
+            FlowEditorScreen(onBack = { navController.popBackStack() }, onExport = transfer.exportFlow)
         }
     }
 }

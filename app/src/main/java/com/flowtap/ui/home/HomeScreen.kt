@@ -14,6 +14,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -25,6 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -41,6 +50,8 @@ fun HomeScreen(
     contentPadding: PaddingValues,
     onCreateFlow: () -> Unit,
     onEditFlow: (Long) -> Unit,
+    onImport: () -> Unit,
+    onExportAll: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -52,6 +63,8 @@ fun HomeScreen(
         onRun = viewModel::run,
         onCreateFlow = onCreateFlow,
         onEditFlow = onEditFlow,
+        onImport = onImport,
+        onExportAll = onExportAll,
     )
 }
 
@@ -64,6 +77,8 @@ private fun HomeContent(
     onRun: (TapFlow) -> Unit,
     onCreateFlow: () -> Unit,
     onEditFlow: (Long) -> Unit,
+    onImport: () -> Unit,
+    onExportAll: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
@@ -74,6 +89,7 @@ private fun HomeContent(
         topBar = {
             LargeTopAppBar(
                 title = { Text("My Flows") },
+                actions = { HomeOverflow(hasFlows = uiState.flows.isNotEmpty(), onImport, onExportAll) },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -98,6 +114,8 @@ private fun HomeContent(
                     "the screen at bedtime. Build one and run it with a single tap.",
                 actionLabel = "Create your first flow",
                 onAction = onCreateFlow,
+                secondaryLabel = "Import from the other phone",
+                onSecondary = onImport,
                 modifier = Modifier.padding(innerPadding),
             )
             else -> LazyVerticalGrid(
@@ -130,6 +148,27 @@ private fun HomeContent(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeOverflow(hasFlows: Boolean, onImport: () -> Unit, onExportAll: () -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Import flows") },
+                leadingIcon = { Icon(Icons.Rounded.Download, contentDescription = null) },
+                onClick = { open = false; onImport() },
+            )
+            DropdownMenuItem(
+                text = { Text("Export all flows") },
+                leadingIcon = { Icon(Icons.Rounded.IosShare, contentDescription = null) },
+                enabled = hasFlows,
+                onClick = { open = false; onExportAll() },
+            )
         }
     }
 }
