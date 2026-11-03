@@ -37,9 +37,17 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    lint {
+        // Versions are pinned on purpose (see libs.versions.toml); bump them deliberately, not on every lint run.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+        // AAPT still wants adaptive icons under -v26 even when minSdk is 26.
+        disable += "ObsoleteSdkInt"
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true
     }
 }
 
@@ -53,6 +61,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.navigation.compose)
 
     implementation(platform(libs.androidx.compose.bom))
@@ -72,6 +81,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.reorderable)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)

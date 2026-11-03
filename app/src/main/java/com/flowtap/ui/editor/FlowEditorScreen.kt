@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -87,6 +88,7 @@ import com.flowtap.ui.common.summary
 import com.flowtap.ui.common.timeLabel
 import com.flowtap.ui.common.title
 import com.flowtap.ui.common.vector
+import com.flowtap.ui.run.RunReportDialog
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -99,6 +101,8 @@ fun FlowEditorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val apps by viewModel.apps.collectAsStateWithLifecycle()
+    val testReport by viewModel.testReport.collectAsStateWithLifecycle()
+    val testing by viewModel.testing.collectAsStateWithLifecycle()
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
 
@@ -125,7 +129,9 @@ fun FlowEditorScreen(
                     }
                     if (!uiState.isNew) {
                         EditorOverflow(
-                            exportEnabled = !uiState.hasChanges,
+                            saved = !uiState.hasChanges,
+                            testing = testing,
+                            onTest = viewModel::testAsAutomation,
                             onExport = { onExport(viewModel.flowId) },
                             onDelete = { confirmDelete = true },
                         )
@@ -178,6 +184,7 @@ fun FlowEditorScreen(
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
     }
+    testReport?.let { RunReportDialog(it, onDismiss = viewModel::dismissTestReport) }
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
@@ -190,15 +197,30 @@ fun FlowEditorScreen(
 }
 
 @Composable
-private fun EditorOverflow(exportEnabled: Boolean, onExport: () -> Unit, onDelete: () -> Unit) {
+private fun EditorOverflow(
+    saved: Boolean,
+    testing: Boolean,
+    onTest: () -> Unit,
+    onExport: () -> Unit,
+    onDelete: () -> Unit,
+) {
     var open by rememberSaveable { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More") }
+        IconButton(onClick = { open = true }) {
+            if (testing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            else Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+        }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
-                text = { Text(if (exportEnabled) "Export flow" else "Save to export") },
+                text = { Text(if (saved) "Test as automation" else "Save to test as automation") },
+                leadingIcon = { Icon(Icons.Rounded.Science, contentDescription = null) },
+                enabled = saved && !testing,
+                onClick = { open = false; onTest() },
+            )
+            DropdownMenuItem(
+                text = { Text(if (saved) "Export flow" else "Save to export") },
                 leadingIcon = { Icon(Icons.Rounded.IosShare, contentDescription = null) },
-                enabled = exportEnabled,
+                enabled = saved,
                 onClick = { open = false; onExport() },
             )
             DropdownMenuItem(

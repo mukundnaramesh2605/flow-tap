@@ -28,8 +28,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.flowtap.domain.model.Trigger
 import java.time.DayOfWeek
@@ -53,7 +54,7 @@ fun ScheduleDialog(
     )
     var days by rememberSaveable(edit) { mutableStateOf(edit.days.toList()) }
     // The clock dial needs ~400dp; fall back to text entry on short screens (e.g. landscape).
-    val roomy = LocalConfiguration.current.screenHeightDp >= 600
+    val roomy = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } >= 600.dp
 
     AlertDialog(
         onDismissRequest = onDismiss,

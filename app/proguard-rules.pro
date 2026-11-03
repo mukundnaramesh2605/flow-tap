@@ -4,3 +4,6 @@
     *** Companion;
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# Shizuku starts the user service by class name in a separate (shell) process.
+-keep class com.flowtap.system.shizuku.ShellService { <init>(...); }

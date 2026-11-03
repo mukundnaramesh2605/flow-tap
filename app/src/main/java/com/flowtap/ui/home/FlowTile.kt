@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Icon
@@ -179,14 +180,22 @@ private fun TileStatus(flow: TapFlow, runState: RunState?) {
                     }
                 }
                 is RunState.Running -> Text(
-                    text = "${state.stepIndex + 1}/${state.totalSteps} · ${flow.actions[state.stepIndex].summary}",
+                    // getOrNull: the flow may have been edited while this run was going.
+                    text = "${state.stepIndex + 1}/${state.totalSteps}" +
+                        (flow.actions.getOrNull(state.stepIndex)?.let { " · ${it.summary}" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                RunState.Succeeded -> StatusBadge(Icons.Rounded.CheckCircle, "Done")
-                is RunState.Failed -> StatusBadge(Icons.Rounded.Error, state.reason)
+                is RunState.Finished -> when {
+                    state.issues.isEmpty() -> StatusBadge(Icons.Rounded.CheckCircle, "Done")
+                    state.allFailed -> StatusBadge(Icons.Rounded.Error, "Didn't run")
+                    else -> StatusBadge(
+                        Icons.Rounded.Info,
+                        if (state.issues.size == 1) "Done · 1 note" else "Done · ${state.issues.size} notes",
+                    )
+                }
             }
         }
     }

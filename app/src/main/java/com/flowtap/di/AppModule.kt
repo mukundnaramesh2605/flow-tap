@@ -2,7 +2,9 @@ package com.flowtap.di
 
 import com.flowtap.data.FlowRepository
 import com.flowtap.data.RoomFlowRepository
-import com.flowtap.data.run.PreviewFlowRunner
+import com.flowtap.data.actions.ActionDispatcher
+import com.flowtap.data.run.DefaultFlowRunner
+import com.flowtap.domain.run.ActionExecutor
 import com.flowtap.domain.run.FlowRunner
 import dagger.Binds
 import dagger.Module
@@ -17,5 +19,8 @@ abstract class AppModule {
     abstract fun bindFlowRepository(impl: RoomFlowRepository): FlowRepository
 
     @Binds
-    abstract fun bindFlowRunner(impl: PreviewFlowRunner): FlowRunner
+    abstract fun bindFlowRunner(impl: DefaultFlowRunner): FlowRunner
+
+    @Binds
+    abstract fun bindActionExecutor(impl: ActionDispatcher): ActionExecutor
 }

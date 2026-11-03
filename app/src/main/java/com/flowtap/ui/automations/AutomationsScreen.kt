@@ -168,7 +168,7 @@ private fun formatNextRun(at: ZonedDateTime, now: ZonedDateTime = ZonedDateTime.
     val until = Duration.between(now, at)
     val relative = when {
         until.toMinutes() < 60 -> "in ${until.toMinutes().coerceAtLeast(1)} min"
-        until.toHours() < 24 -> "in ${until.toHours()}h ${until.toMinutesPart()}m"
+        until.toHours() < 24 -> "in ${until.toHours()}h ${until.toMinutes() % 60}m"
         else -> at.format(DateTimeFormatter.ofPattern("EEE"))
     }
     val time = at.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))

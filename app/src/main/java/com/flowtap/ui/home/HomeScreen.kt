@@ -27,10 +27,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -44,6 +50,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.flowtap.domain.model.TapFlow
 import com.flowtap.domain.run.RunState
 import com.flowtap.ui.common.EmptyState
+import com.flowtap.ui.run.RunReportDialog
+import com.flowtap.ui.run.snackbarText
 
 @Composable
 fun HomeScreen(
@@ -56,7 +64,24 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val runStates by viewModel.runStates.collectAsStateWithLifecycle()
+    val openReport by viewModel.openReport.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(viewModel) {
+        viewModel.finishedWithIssues.collect { report ->
+            val result = snackbarHostState.showSnackbar(
+                message = report.snackbarText(),
+                actionLabel = "Details",
+                withDismissAction = true,
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.showReport(report)
+        }
+    }
+    openReport?.let { RunReportDialog(it, onDismiss = { viewModel.showReport(null) }) }
+
     HomeContent(
+        snackbarHostState = snackbarHostState,
         uiState = uiState,
         runStates = runStates,
         contentPadding = contentPadding,
@@ -71,6 +96,7 @@ fun HomeScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeContent(
+    snackbarHostState: SnackbarHostState,
     uiState: HomeUiState,
     runStates: Map<Long, RunState>,
     contentPadding: PaddingValues,
@@ -86,6 +112,7 @@ private fun HomeContent(
             .padding(bottom = contentPadding.calculateBottomPadding())
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             LargeTopAppBar(
                 title = { Text("My Flows") },

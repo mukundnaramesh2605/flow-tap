@@ -9,11 +9,13 @@ import androidx.navigation.toRoute
 import com.flowtap.data.FlowRepository
 import com.flowtap.data.apps.AppCatalog
 import com.flowtap.data.apps.InstalledApp
+import com.flowtap.data.run.FlowRunManager
 import com.flowtap.domain.model.FlowAction
 import com.flowtap.domain.model.FlowColor
 import com.flowtap.domain.model.FlowIcon
 import com.flowtap.domain.model.TapFlow
 import com.flowtap.domain.model.Trigger
+import com.flowtap.domain.run.RunState
 import com.flowtap.ui.navigation.EditorRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -64,6 +66,7 @@ class FlowEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: FlowRepository,
     private val appCatalog: AppCatalog,
+    private val runManager: FlowRunManager,
 ) : ViewModel() {
 
     val flowId = savedStateHandle.toRoute<EditorRoute>().flowId
@@ -82,6 +85,14 @@ class FlowEditorViewModel @Inject constructor(
 
     /** Launchable apps for the picker; null until first requested and loaded. */
     val apps: StateFlow<List<InstalledApp>?> = _apps.asStateFlow()
+
+    private val _testReport = MutableStateFlow<RunState.Finished?>(null)
+
+    /** Result of the last "test as automation" run, shown until dismissed. */
+    val testReport: StateFlow<RunState.Finished?> = _testReport.asStateFlow()
+
+    private val _testing = MutableStateFlow(false)
+    val testing: StateFlow<Boolean> = _testing.asStateFlow()
 
     init {
         if (isNew) {
@@ -205,6 +216,29 @@ class FlowEditorViewModel @Inject constructor(
 
     fun deleteSchedule(triggerId: String) = edit {
         copy(triggers = triggers.filterNot { it.id == triggerId }, scheduleEdit = null)
+    }
+
+    // --- Test run ---
+
+    /**
+     * Runs the saved flow the way an automation would (no UI assumed), so the Shizuku and
+     * notification fallbacks can be checked without waiting for a schedule.
+     */
+    fun testAsAutomation() {
+        val state = _uiState.value
+        if (state.isNew || state.hasChanges || _testing.value) return
+        viewModelScope.launch {
+            _testing.value = true
+            try {
+                _testReport.value = runManager.start(buildFlow(state), interactive = false).await()
+            } finally {
+                _testing.value = false
+            }
+        }
+    }
+
+    fun dismissTestReport() {
+        _testReport.value = null
     }
 
     // --- Persist ---
