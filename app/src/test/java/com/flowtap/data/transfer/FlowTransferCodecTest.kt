@@ -86,4 +86,20 @@ class FlowTransferCodecTest {
         assertThrows(ImportFormatException::class.java) { FlowTransferCodec.decode("""[1,2,3]""") }
         assertThrows(ImportFormatException::class.java) { FlowTransferCodec.decode("""{"format":"flowtap"}""") }
     }
+
+    @Test
+    fun `bluetooth triggers round trip with a fresh id`() {
+        val trigger = Trigger.BluetoothDevice(
+            id = "bt-1",
+            address = "00:11:22:AA:BB:CC",
+            deviceName = "Car Audio",
+            event = Trigger.ConnectionEvent.Disconnected,
+            enabled = false,
+        )
+        val json = FlowTransferCodec.encode(listOf(SampleFlows.driving.copy(triggers = listOf(trigger))), "x")
+        val imported = FlowTransferCodec.decode(json).flows.single().flow.triggers.single() as Trigger.BluetoothDevice
+
+        assertNotEquals(trigger.id, imported.id)
+        assertEquals(trigger.copy(id = imported.id), imported)
+    }
 }

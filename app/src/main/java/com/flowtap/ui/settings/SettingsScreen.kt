@@ -43,7 +43,7 @@ fun SettingsScreen(contentPadding: PaddingValues, onImport: () -> Unit, onExport
             item { SectionLabel("System access") }
             item { SettingRow(Icons.Rounded.Terminal, "Shizuku", "Silent Wi-Fi & Bluetooth toggles · phase 5") }
             item { SettingRow(Icons.Rounded.Security, "Permissions", "Phone, SMS, camera, brightness · phase 5") }
-            item { SettingRow(Icons.Rounded.BatteryAlert, "Battery optimization", "Keeps automations on time · phase 4") }
+            item { SettingRow(Icons.Rounded.BatteryAlert, "Battery optimization", "Checked on the Automations tab") }
             item { SectionLabel("Your flows") }
             item {
                 SettingRow(Icons.Rounded.IosShare, "Export all flows", "Share a file to set up the other phone", onExportAll)

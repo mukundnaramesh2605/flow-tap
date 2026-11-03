@@ -1,8 +1,10 @@
 package com.flowtap.system
 
+import android.annotation.SuppressLint
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.flowtap.system.shizuku.ShizukuManager
@@ -20,6 +22,9 @@ enum class SpecialAccess {
 
     /** "Display over other apps": lets automations open apps while FlowTap is in the background. */
     Overlay,
+
+    /** Exempt from battery optimization, so Doze and OEM task killers leave automations alone. */
+    BatteryUnrestricted,
 }
 
 /**
@@ -39,6 +44,8 @@ class SystemAccess @Inject constructor(
         SpecialAccess.DoNotDisturb ->
             context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
         SpecialAccess.Overlay -> Settings.canDrawOverlays(context)
+        SpecialAccess.BatteryUnrestricted ->
+            context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
     }
 
     /** True if FlowTap has [access], granting it via Shizuku first when possible. */
@@ -49,16 +56,20 @@ class SystemAccess @Inject constructor(
             SpecialAccess.WriteSettings -> "appops set $pkg WRITE_SETTINGS allow"
             SpecialAccess.DoNotDisturb -> "cmd notification allow_dnd $pkg"
             SpecialAccess.Overlay -> "appops set $pkg SYSTEM_ALERT_WINDOW allow"
+            SpecialAccess.BatteryUnrestricted -> "dumpsys deviceidle whitelist +$pkg"
         }
         shizuku.exec(command) ?: return false
         return has(access)
     }
 
     /** The settings screen where the user can grant [access] by hand. */
+    @SuppressLint("BatteryLife") // Sideloaded personal app; Play's policy on this dialog doesn't apply.
     fun settingsAction(access: SpecialAccess): String = when (access) {
         SpecialAccess.WriteSettings -> Settings.ACTION_MANAGE_WRITE_SETTINGS
         SpecialAccess.DoNotDisturb -> Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS
         SpecialAccess.Overlay -> Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+        // The direct "allow?" dialog; needs REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, fine for a sideloaded app.
+        SpecialAccess.BatteryUnrestricted -> Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
     }
 
     /** Whether [settingsAction] takes a package: URI (DND access doesn't). */

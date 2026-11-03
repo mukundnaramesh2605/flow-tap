@@ -9,6 +9,13 @@ import java.util.Locale
 
 fun Trigger.describe(locale: Locale = Locale.getDefault()): String = when (this) {
     is Trigger.TimeOfDay -> "${timeLabel(locale)} · ${daysLabel(locale)}"
+    is Trigger.BluetoothDevice -> eventLabel()
+}
+
+/** "When Car Audio connects". */
+fun Trigger.BluetoothDevice.eventLabel(): String = when (event) {
+    Trigger.ConnectionEvent.Connected -> "When $deviceName connects"
+    Trigger.ConnectionEvent.Disconnected -> "When $deviceName disconnects"
 }
 
 fun Trigger.TimeOfDay.timeLabel(locale: Locale = Locale.getDefault()): String =

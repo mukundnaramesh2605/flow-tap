@@ -9,6 +9,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.flowtap.automation.PendingRuns
+import com.flowtap.data.FlowRepository
+import com.flowtap.data.run.FlowRunManager
 import com.flowtap.data.transfer.IncomingImports
 import com.flowtap.system.shizuku.ShizukuManager
 import com.flowtap.system.shizuku.ShizukuStatus
@@ -25,13 +28,16 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var incomingImports: IncomingImports
     @Inject lateinit var shizuku: ShizukuManager
+    @Inject lateinit var repository: FlowRepository
+    @Inject lateinit var runManager: FlowRunManager
+    @Inject lateinit var pendingRuns: PendingRuns
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState == null) {
-            handleImportIntent(intent)
+            handleIntent(intent)
             askForShizukuOnce()
         }
         setContent {
@@ -43,7 +49,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleImportIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) = handleImportIntent(intent)
+
+    /**
+     * Runs queued by [RunFlowActivity] ("Tap to run" notifications). Started on resume, once FlowTap
+     * is on screen, so steps that open apps can do so directly.
+     */
+    override fun onResume() {
+        super.onResume()
+        val ids = pendingRuns.drain()
+        if (ids.isEmpty()) return
+        lifecycleScope.launch {
+            ids.forEach { id -> repository.getFlow(id)?.let { runManager.start(it, interactive = true) } }
+        }
     }
 
     /**

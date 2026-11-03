@@ -15,6 +15,7 @@ import com.flowtap.domain.model.FlowColor
 import com.flowtap.domain.model.FlowIcon
 import com.flowtap.domain.model.TapFlow
 import com.flowtap.domain.model.Trigger
+import com.flowtap.domain.model.withEnabled
 import com.flowtap.domain.run.RunState
 import com.flowtap.ui.navigation.EditorRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -38,6 +39,13 @@ data class ActionEdit(val key: Long?, val action: FlowAction)
 /** The schedule open in the schedule dialog. [triggerId] is null while adding a new one. */
 data class ScheduleEdit(val triggerId: String?, val hour: Int, val minute: Int, val days: Set<Int>)
 
+/** The Bluetooth trigger open in its dialog. [triggerId] is null while adding a new one. */
+data class BluetoothEdit(
+    val triggerId: String?,
+    val address: String?,
+    val event: Trigger.ConnectionEvent,
+)
+
 data class EditorUiState(
     val isNew: Boolean,
     val isLoading: Boolean = !isNew,
@@ -52,6 +60,7 @@ data class EditorUiState(
     val showActionPicker: Boolean = false,
     val actionEdit: ActionEdit? = null,
     val scheduleEdit: ScheduleEdit? = null,
+    val bluetoothEdit: BluetoothEdit? = null,
 ) {
     val canSave: Boolean get() = !isLoading && name.isNotBlank()
 }
@@ -178,10 +187,15 @@ class FlowEditorViewModel @Inject constructor(
         it.copy(scheduleEdit = ScheduleEdit(triggerId = null, hour = 22, minute = 0, days = Trigger.TimeOfDay.ALL_DAYS))
     }
 
-    fun startEditSchedule(triggerId: String) {
-        val trigger = _uiState.value.triggers.find { it.id == triggerId } as? Trigger.TimeOfDay ?: return
-        _uiState.update {
-            it.copy(scheduleEdit = ScheduleEdit(trigger.id, trigger.hour, trigger.minute, trigger.days))
+    fun startEditTrigger(triggerId: String) {
+        when (val trigger = _uiState.value.triggers.find { it.id == triggerId }) {
+            is Trigger.TimeOfDay -> _uiState.update {
+                it.copy(scheduleEdit = ScheduleEdit(trigger.id, trigger.hour, trigger.minute, trigger.days))
+            }
+            is Trigger.BluetoothDevice -> _uiState.update {
+                it.copy(bluetoothEdit = BluetoothEdit(trigger.id, trigger.address, trigger.event))
+            }
+            null -> Unit
         }
     }
 
@@ -203,19 +217,38 @@ class FlowEditorViewModel @Inject constructor(
         }
     }
 
-    fun setScheduleEnabled(triggerId: String, enabled: Boolean) = edit {
-        copy(
-            triggers = triggers.map { t ->
-                if (t.id != triggerId) t
-                else when (t) {
-                    is Trigger.TimeOfDay -> t.copy(enabled = enabled)
+    fun startNewBluetoothTrigger() = _uiState.update {
+        it.copy(bluetoothEdit = BluetoothEdit(triggerId = null, address = null, event = Trigger.ConnectionEvent.Connected))
+    }
+
+    fun dismissBluetoothEdit() = _uiState.update { it.copy(bluetoothEdit = null) }
+
+    fun commitBluetoothTrigger(address: String, deviceName: String, event: Trigger.ConnectionEvent) {
+        val editing = _uiState.value.bluetoothEdit ?: return
+        edit {
+            val updated = if (editing.triggerId == null) {
+                triggers + Trigger.BluetoothDevice(UUID.randomUUID().toString(), address, deviceName, event)
+            } else {
+                triggers.map { t ->
+                    if (t is Trigger.BluetoothDevice && t.id == editing.triggerId) {
+                        t.copy(address = address, deviceName = deviceName, event = event)
+                    } else {
+                        t
+                    }
                 }
-            },
+            }
+            copy(triggers = updated, bluetoothEdit = null)
+        }
+    }
+
+    fun setTriggerEnabled(triggerId: String, enabled: Boolean) = edit {
+        copy(
+            triggers = triggers.map { t -> if (t.id == triggerId) t.withEnabled(enabled) else t },
         )
     }
 
-    fun deleteSchedule(triggerId: String) = edit {
-        copy(triggers = triggers.filterNot { it.id == triggerId }, scheduleEdit = null)
+    fun deleteTrigger(triggerId: String) = edit {
+        copy(triggers = triggers.filterNot { it.id == triggerId }, scheduleEdit = null, bluetoothEdit = null)
     }
 
     // --- Test run ---

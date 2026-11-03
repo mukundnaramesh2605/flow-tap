@@ -36,6 +36,10 @@ class Notifier @Inject constructor(
                 NotificationChannel(CHANNEL_ACTION_NEEDED, "Needs your tap", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "When an automation can't finish a step on its own, e.g. Wi-Fi without Shizuku"
                 },
+                NotificationChannel(CHANNEL_RUNNING, "Running automations", NotificationManager.IMPORTANCE_LOW).apply {
+                    description = "Shown briefly while a scheduled or triggered flow runs in the background"
+                    setShowBadge(false)
+                },
             ),
         )
     }
@@ -100,5 +104,6 @@ class Notifier @Inject constructor(
     companion object {
         const val CHANNEL_MESSAGES = "flow_messages"
         const val CHANNEL_ACTION_NEEDED = "action_needed"
+        const val CHANNEL_RUNNING = "running"
     }
 }

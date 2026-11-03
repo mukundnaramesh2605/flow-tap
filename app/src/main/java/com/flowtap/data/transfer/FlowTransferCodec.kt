@@ -6,6 +6,7 @@ import com.flowtap.domain.model.FlowColor
 import com.flowtap.domain.model.FlowIcon
 import com.flowtap.domain.model.TapFlow
 import com.flowtap.domain.model.Trigger
+import com.flowtap.domain.model.withId
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -123,8 +124,4 @@ object FlowTransferCodec {
 
     private fun JsonObject.string(key: String): String? =
         (this[key] as? JsonPrimitive)?.contentOrNull
-
-    private fun Trigger.withId(id: String): Trigger = when (this) {
-        is Trigger.TimeOfDay -> copy(id = id)
-    }
 }

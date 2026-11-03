@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
@@ -82,6 +83,7 @@ import com.flowtap.domain.model.FlowIcon
 import com.flowtap.domain.model.Trigger
 import com.flowtap.ui.common.brush
 import com.flowtap.ui.common.daysLabel
+import com.flowtap.ui.common.eventLabel
 import com.flowtap.ui.common.icon
 import com.flowtap.ui.common.primary
 import com.flowtap.ui.common.summary
@@ -165,8 +167,16 @@ fun FlowEditorScreen(
         ScheduleDialog(
             edit = edit,
             onSave = viewModel::commitSchedule,
-            onDelete = edit.triggerId?.let { id -> { viewModel.deleteSchedule(id) } },
+            onDelete = edit.triggerId?.let { id -> { viewModel.deleteTrigger(id) } },
             onDismiss = viewModel::dismissScheduleEdit,
+        )
+    }
+    uiState.bluetoothEdit?.let { edit ->
+        BluetoothTriggerDialog(
+            edit = edit,
+            onSave = viewModel::commitBluetoothTrigger,
+            onDelete = edit.triggerId?.let { id -> { viewModel.deleteTrigger(id) } },
+            onDismiss = viewModel::dismissBluetoothEdit,
         )
     }
     if (confirmDelete) {
@@ -323,24 +333,31 @@ private fun EditorList(uiState: EditorUiState, innerPadding: PaddingValues, view
 
         item(key = "schedules") {
             Column(Modifier.padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionHeader("Schedules", hint = "Fires automatically from phase 4")
+                SectionHeader("Automations")
                 if (uiState.triggers.isEmpty()) {
-                    PlaceholderCard("Runs only when you tap it. Add a schedule to run it automatically.")
+                    PlaceholderCard("Runs only when you tap it. Add a schedule or a Bluetooth trigger to run it automatically.")
                 }
                 uiState.triggers.forEach { trigger ->
                     TriggerRow(
                         trigger = trigger,
-                        onClick = { viewModel.startEditSchedule(trigger.id) },
-                        onToggle = { viewModel.setScheduleEnabled(trigger.id, it) },
+                        onClick = { viewModel.startEditTrigger(trigger.id) },
+                        onToggle = { viewModel.setTriggerEnabled(trigger.id, it) },
                     )
                 }
-                OutlinedButton(
-                    onClick = viewModel::startNewSchedule,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(Icons.Rounded.Schedule, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add schedule")
+                    OutlinedButton(onClick = viewModel::startNewSchedule, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Rounded.Schedule, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Schedule")
+                    }
+                    OutlinedButton(onClick = viewModel::startNewBluetoothTrigger, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Rounded.Bluetooth, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Bluetooth")
+                    }
                 }
             }
         }
@@ -424,13 +441,21 @@ private fun TriggerRow(trigger: Trigger, onClick: () -> Unit, onToggle: (Boolean
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(
+                if (trigger is Trigger.BluetoothDevice) Icons.Rounded.Bluetooth else Icons.Rounded.Schedule,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 when (trigger) {
                     is Trigger.TimeOfDay -> {
                         Text(trigger.timeLabel(), style = MaterialTheme.typography.titleMedium)
                         Text(trigger.daysLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    is Trigger.BluetoothDevice -> {
+                        Text(trigger.deviceName, style = MaterialTheme.typography.titleMedium)
+                        Text(trigger.eventLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

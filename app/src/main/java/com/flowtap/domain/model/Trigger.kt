@@ -30,4 +30,31 @@ sealed interface Trigger {
             val WEEKEND: Set<Int> = setOf(6, 7)
         }
     }
+
+    /**
+     * Fires when the paired Bluetooth device [address] connects or disconnects, e.g. the car.
+     * The address belongs to the other device, so it carries over when a flow is exported.
+     */
+    @Serializable
+    @SerialName("bluetooth_device")
+    data class BluetoothDevice(
+        override val id: String,
+        val address: String,
+        val deviceName: String,
+        val event: ConnectionEvent = ConnectionEvent.Connected,
+        override val enabled: Boolean = true,
+    ) : Trigger
+
+    @Serializable
+    enum class ConnectionEvent { Connected, Disconnected }
+}
+
+fun Trigger.withEnabled(enabled: Boolean): Trigger = when (this) {
+    is Trigger.TimeOfDay -> copy(enabled = enabled)
+    is Trigger.BluetoothDevice -> copy(enabled = enabled)
+}
+
+fun Trigger.withId(id: String): Trigger = when (this) {
+    is Trigger.TimeOfDay -> copy(id = id)
+    is Trigger.BluetoothDevice -> copy(id = id)
 }
