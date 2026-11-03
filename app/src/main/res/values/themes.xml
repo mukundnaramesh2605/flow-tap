@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.FlowTap" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.FlowTap.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/brand</item>
+        <item name="postSplashScreenTheme">@style/Theme.FlowTap</item>
+    </style>
+</resources>
