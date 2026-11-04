@@ -1,5 +1,7 @@
 package com.flowtap.ui.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -46,6 +48,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.flowtap.domain.model.TapFlow
 import com.flowtap.domain.run.RunState
@@ -58,6 +62,7 @@ fun HomeScreen(
     contentPadding: PaddingValues,
     onCreateFlow: () -> Unit,
     onEditFlow: (Long) -> Unit,
+    onOpenPermissions: () -> Unit,
     onImport: () -> Unit,
     onExportAll: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -65,7 +70,15 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val runStates by viewModel.runStates.collectAsStateWithLifecycle()
     val openReport by viewModel.openReport.collectAsStateWithLifecycle()
+    val preflight by viewModel.preflight.collectAsStateWithLifecycle()
+    val setupCount by viewModel.setupCount.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val requestPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.finishPreflight()
+    }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshSetup() }
+    LaunchedEffect(uiState.flows) { viewModel.refreshSetup() }
 
     LaunchedEffect(viewModel) {
         viewModel.finishedWithIssues.collect { report ->
@@ -79,13 +92,23 @@ fun HomeScreen(
         }
     }
     openReport?.let { RunReportDialog(it, onDismiss = { viewModel.showReport(null) }) }
+    preflight?.let { pending ->
+        PreflightDialog(
+            preflight = pending,
+            onContinue = { requestPermissions.launch(viewModel.preflightPermissions()) },
+            onSkip = viewModel::finishPreflight,
+            onDismiss = viewModel::cancelPreflight,
+        )
+    }
 
     HomeContent(
         snackbarHostState = snackbarHostState,
         uiState = uiState,
         runStates = runStates,
+        setupCount = setupCount,
         contentPadding = contentPadding,
-        onRun = viewModel::run,
+        onRun = viewModel::onTileTap,
+        onOpenPermissions = onOpenPermissions,
         onCreateFlow = onCreateFlow,
         onEditFlow = onEditFlow,
         onImport = onImport,
@@ -99,8 +122,10 @@ private fun HomeContent(
     snackbarHostState: SnackbarHostState,
     uiState: HomeUiState,
     runStates: Map<Long, RunState>,
+    setupCount: Int,
     contentPadding: PaddingValues,
     onRun: (TapFlow) -> Unit,
+    onOpenPermissions: () -> Unit,
     onCreateFlow: () -> Unit,
     onEditFlow: (Long) -> Unit,
     onImport: () -> Unit,
@@ -156,6 +181,11 @@ private fun HomeContent(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (setupCount > 0) {
+                    item(key = "setup", span = { GridItemSpan(maxLineSpan) }) {
+                        SetupBanner(count = setupCount, onClick = onOpenPermissions, modifier = Modifier.animateItem())
+                    }
+                }
                 items(uiState.flows, key = { it.id }) { flow ->
                     FlowTile(
                         flow = flow,

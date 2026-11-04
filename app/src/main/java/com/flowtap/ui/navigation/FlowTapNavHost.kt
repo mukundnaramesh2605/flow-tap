@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import com.flowtap.ui.automations.AutomationsScreen
 import com.flowtap.ui.editor.FlowEditorScreen
 import com.flowtap.ui.home.HomeScreen
+import com.flowtap.ui.permissions.PermissionsScreen
 import com.flowtap.ui.settings.SettingsScreen
 import com.flowtap.ui.transfer.TransferController
 
@@ -35,6 +36,7 @@ fun FlowTapNavHost(
                 contentPadding = contentPadding,
                 onCreateFlow = { navController.navigate(EditorRoute()) },
                 onEditFlow = { id -> navController.navigate(EditorRoute(flowId = id)) },
+                onOpenPermissions = { navController.navigate(PermissionsRoute) },
                 onImport = transfer.import,
                 onExportAll = transfer.exportAll,
             )
@@ -50,7 +52,14 @@ fun FlowTapNavHost(
                 contentPadding = contentPadding,
                 onImport = transfer.import,
                 onExportAll = transfer.exportAll,
+                onOpenPermissions = { navController.navigate(PermissionsRoute) },
             )
+        }
+        composable<PermissionsRoute>(
+            enterTransition = { slideInHorizontally { it } + fadeIn() },
+            popExitTransition = { slideOutHorizontally { it } + fadeOut() },
+        ) {
+            PermissionsScreen(onBack = { navController.popBackStack() })
         }
         composable<EditorRoute>(
             enterTransition = { slideInHorizontally { it } + fadeIn() },

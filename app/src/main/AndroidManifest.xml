@@ -44,6 +44,8 @@
 
     <!-- Lets the app picker and import check see launchable apps on Android 11+. -->
     <queries>
+        <!-- To show "Open Shizuku" and detect whether it's installed. -->
+        <package android:name="moe.shizuku.privileged.api" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

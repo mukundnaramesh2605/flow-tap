@@ -104,6 +104,22 @@ class ShizukuManager @Inject constructor(
         false
     }
 
+    /**
+     * Explicit "Allow" from Settings. Returns false when Shizuku won't show its dialog because the
+     * user chose "deny and don't ask again"; FlowTap must then be allowed from inside the Shizuku app.
+     */
+    fun requestPermission(): Boolean = try {
+        if (refresh() != ShizukuStatus.PermissionNeeded || Shizuku.shouldShowRequestPermissionRationale()) {
+            false
+        } else {
+            Shizuku.requestPermission(PERMISSION_REQUEST_CODE)
+            true
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "Shizuku permission request failed", e)
+        false
+    }
+
     /** Runs [command] as the shell user. Returns null when Shizuku isn't usable right now. */
     suspend fun exec(command: String): ShellResult? {
         if (!isReady) return null
